@@ -1,17 +1,28 @@
 import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import {
-    View, Text, TextInput, StyleSheet, Button, Alert, ScrollView, Switch,
-} from 'react-native';
+    Text,
+    TextInput,
+    Button,
+    Switch,
+    HelperText,
+    ActivityIndicator,
+    Snackbar,
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    obtenerProducto, insertarProductoLocal, actualizarProductoLocal,
+    obtenerProducto,
+    insertarProductoLocal,
+    actualizarProductoLocal,
 } from '../repositories/productosRepo';
 import { crearProducto, actualizarProducto } from '../api/sheetsApi';
 import { registrarAjuste } from '../repositories/ventasRepo';
 import { getOrCreateDeviceId, getMeta } from '../db/database';
+import { Producto } from '../types';
+import { commonStyles, colores } from '../styles/commonStyles';
 
 type Props = {
-    productoId?: string;    // si viene, es edición
+    productoId?: string;
     onCerrar: (huboCambios: boolean) => void;
 };
 
@@ -21,8 +32,10 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
     const [precio, setPrecio] = useState('');
     const [stockMinimo, setStockMinimo] = useState('0');
     const [activo, setActivo] = useState(true);
-    const [ajusteStock, setAjusteStock] = useState(''); // solo en edición
+    const [ajusteStock, setAjusteStock] = useState('');
     const [guardando, setGuardando] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [exito, setExito] = useState<string | null>(null);
     const esEdicion = Boolean(productoId);
 
     useEffect(() => {
@@ -38,19 +51,20 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
                 }
             })();
         } else {
-            // id nuevo: SKU o UUID
             setId('P-' + Math.random().toString(36).slice(2, 8).toUpperCase());
         }
     }, [productoId]);
 
     async function guardar() {
+        setError(null);
+        setExito(null);
         if (!nombre.trim()) {
-            Alert.alert('El nombre es obligatorio');
+            setError('El nombre es obligatorio');
             return;
         }
         const precioNum = Number(precio);
         if (isNaN(precioNum) || precioNum < 0) {
-            Alert.alert('Precio inválido');
+            setError('Precio inválido');
             return;
         }
         const stockMinNum = Number(stockMinimo) || 0;
@@ -58,29 +72,38 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
         setGuardando(true);
         try {
             if (!esEdicion) {
-                // 1. Crear en la hoja
-                await crearProducto([id, nombre.trim(), precioNum, '', stockMinNum, activo]);
-                // 2. Insertar en local (para que se vea al instante)
+                const prod: Producto = {
+                    id,
+                    nombre: nombre.trim(),
+                    precio: precioNum,
+                    stock_actual: 0,
+                    stock_minimo: stockMinNum,
+                    activo,
+                };
+                await crearProducto(prod);
                 await insertarProductoLocal({
-                    id, nombre: nombre.trim(), precio: precioNum,
-                    stock_actual: 0, stock_minimo: stockMinNum, activo,
+                    id,
+                    nombre: nombre.trim(),
+                    precio: precioNum,
+                    stock_actual: 0,
+                    stock_minimo: stockMinNum,
+                    activo,
                 });
-                Alert.alert('Producto creado', `ID: ${id}`);
-                onCerrar(true);
+                setExito(`Producto creado (ID: ${id})`);
+                setTimeout(() => onCerrar(true), 800);
             } else {
-                // 1. Actualizar campos maestros en la hoja
                 if (nombre.trim()) await actualizarProducto(id, 'nombre', nombre.trim());
                 await actualizarProducto(id, 'precio', precioNum);
                 await actualizarProducto(id, 'stock_minimo', stockMinNum);
                 await actualizarProducto(id, 'activo', activo);
 
-                // 2. Actualizar en local
                 await actualizarProductoLocal(id, {
-                    nombre: nombre.trim(), precio: precioNum,
-                    stock_minimo: stockMinNum, activo,
+                    nombre: nombre.trim(),
+                    precio: precioNum,
+                    stock_minimo: stockMinNum,
+                    activo,
                 });
 
-                // 3. Si hay ajuste de stock, registrarlo como movimiento
                 const ajusteNum = Number(ajusteStock);
                 if (!isNaN(ajusteNum) && ajusteNum !== 0) {
                     const usuario = (await getMeta('usuario_actual')) ?? 'admin';
@@ -93,82 +116,143 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
                     });
                 }
 
-                Alert.alert('Producto actualizado');
-                onCerrar(true);
+                setExito('Producto actualizado');
+                setTimeout(() => onCerrar(true), 800);
             }
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            setError(e.message ?? 'Error al guardar');
         } finally {
             setGuardando(false);
         }
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-            <ScrollView>
-                <Text style={styles.titulo}>{esEdicion ? 'Editar producto' : 'Nuevo producto'}</Text>
+        <SafeAreaView style={[commonStyles.container, styles.fondo]} edges={['top', 'bottom']}>
+            <ScrollView contentContainerStyle={styles.contenido}>
+                <Text variant="titleLarge" style={styles.titulo}>
+                    {esEdicion ? 'Editar producto' : 'Nuevo producto'}
+                </Text>
 
-                <Text style={styles.label}>ID</Text>
-                <TextInput style={styles.input} value={id} editable={false} />
-
-                <Text style={styles.label}>Nombre</Text>
-                <TextInput style={styles.input} value={nombre} onChangeText={setNombre} />
-
-                <Text style={styles.label}>Precio (CUP)</Text>
                 <TextInput
+                    label="ID"
+                    value={id}
+                    editable={false}
+                    mode="outlined"
                     style={styles.input}
+                />
+
+                <TextInput
+                    label="Nombre"
+                    value={nombre}
+                    onChangeText={setNombre}
+                    mode="outlined"
+                    style={styles.input}
+                />
+
+                <TextInput
+                    label="Precio (CUP)"
                     value={precio}
                     onChangeText={setPrecio}
                     keyboardType="decimal-pad"
+                    mode="outlined"
+                    style={styles.input}
                 />
 
-                <Text style={styles.label}>Stock mínimo</Text>
                 <TextInput
-                    style={styles.input}
+                    label="Stock mínimo"
                     value={stockMinimo}
                     onChangeText={setStockMinimo}
                     keyboardType="number-pad"
+                    mode="outlined"
+                    style={styles.input}
                 />
 
                 <View style={styles.switchRow}>
-                    <Text style={styles.label}>Activo</Text>
+                    <Text variant="bodyLarge">Activo</Text>
                     <Switch value={activo} onValueChange={setActivo} />
                 </View>
 
                 {esEdicion && (
                     <>
-                        <Text style={styles.label}>Ajuste de stock (opcional)</Text>
                         <TextInput
-                            style={styles.input}
+                            label="Ajuste de stock (opcional)"
                             value={ajusteStock}
                             onChangeText={setAjusteStock}
                             keyboardType="numbers-and-punctuation"
                             placeholder="Ej: 10 (entrada) o -2 (merma)"
+                            mode="outlined"
+                            style={styles.input}
                         />
-                        <Text style={styles.ayuda}>
+                        <HelperText type="info" visible>
                             Positivo suma stock, negativo resta. Se registrará como movimiento de ajuste.
-                        </Text>
+                        </HelperText>
                     </>
                 )}
 
-                <View style={styles.botones}>
-                    <Button title={guardando ? 'Guardando...' : 'Guardar'} onPress={guardar} disabled={guardando} />
-                    <Button title="Cancelar" onPress={() => onCerrar(false)} />
-                </View>
+                <Button
+                    mode="contained"
+                    icon="content-save"
+                    onPress={guardar}
+                    loading={guardando}
+                    disabled={guardando}
+                    style={styles.botonGuardar}
+                >
+                    {guardando ? 'Guardando...' : 'Guardar'}
+                </Button>
+                <Button
+                    mode="outlined"
+                    onPress={() => onCerrar(false)}
+                    disabled={guardando}
+                >
+                    Cancelar
+                </Button>
+
+                {guardando && (
+                    <View style={styles.overlay}>
+                        <ActivityIndicator size="large" />
+                    </View>
+                )}
             </ScrollView>
+
+            <Snackbar
+                visible={!!error}
+                onDismiss={() => setError(null)}
+                duration={4000}
+                action={{ label: 'Cerrar', onPress: () => setError(null) }}
+            >
+                {error}
+            </Snackbar>
+
+            <Snackbar
+                visible={!!exito}
+                onDismiss={() => setExito(null)}
+                duration={2000}
+                style={{ backgroundColor: colores.stockOk }}
+            >
+                {exito}
+            </Snackbar>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-    titulo: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-    label: { marginTop: 8, fontWeight: '600' },
-    input: {
-        borderWidth: 1, borderColor: '#ccc', borderRadius: 6,
-        paddingHorizontal: 8, paddingVertical: 6, marginTop: 4,
+    fondo: { backgroundColor: '#F8FAFC' },
+    contenido: { padding: 16, paddingBottom: 32 },
+    titulo: { marginBottom: 12 },
+    input: { marginBottom: 8, backgroundColor: '#FFFFFF' },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 8,
+        marginBottom: 8,
+        paddingHorizontal: 4,
     },
-    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-    ayuda: { fontSize: 12, color: '#666', marginTop: 4 },
-    botones: { marginTop: 16, gap: 8 },
+    botonGuardar: { marginTop: 8, marginBottom: 8 },
+    overlay: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 });

@@ -1,4 +1,5 @@
 import { WEB_APP_URL, TOKEN } from '../config/constants';
+import { Producto } from '../types';
 
 async function get(action: string): Promise<any> {
     const url = `${WEB_APP_URL}?action=${action}&token=${TOKEN}`;
@@ -16,6 +17,7 @@ async function post(payload: object): Promise<any> {
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ ...payload, token: TOKEN }),
     });
+
     const json = await res.json();
     if (json.status !== 'ok') {
         throw new Error(json.message || 'Error desconocido');
@@ -40,7 +42,7 @@ export async function appendMovimientos(rows: any[][]): Promise<void> {
     await post({ action: 'appendMovimientos', rows });
 }
 
-export async function crearProducto(fila: any[]): Promise<void> {
+export async function crearProducto(fila: Producto): Promise<void> {
   await post({ action: 'crearProducto', fila });
 }
 

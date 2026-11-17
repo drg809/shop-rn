@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
   View,
-  Text,
   FlatList,
   StyleSheet,
-  Button,
-  TouchableOpacity,
-  Alert,
 } from 'react-native';
+import {
+  Text,
+  Button,
+  Card,
+  IconButton,
+  ActivityIndicator,
+  Snackbar,
+  Divider,
+} from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   listarProductosConStockMostrado,
@@ -19,6 +24,7 @@ import {
   LineaVenta,
 } from '../repositories/ventasRepo';
 import { getMeta, getOrCreateDeviceId } from '../db/database';
+import { commonStyles, colores } from '../styles/commonStyles';
 
 type Props = {
   onCerrar: (huboVenta?: boolean) => void;
@@ -37,6 +43,7 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
   const [usuario, setUsuario] = useState<string>('admin');
   const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function cargar() {
     const lista = await listarProductosConStockMostrado();
@@ -89,14 +96,15 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
 
   async function confirmar() {
     if (carrito.length === 0) {
-      Alert.alert('Carrito vacío');
+      setError('Carrito vacío');
       return;
     }
     if (!usuario) {
-      Alert.alert('Selecciona un usuario');
+      setError('Selecciona un usuario');
       return;
     }
     setGuardando(true);
+    setError(null);
     try {
       const lineas: LineaVenta[] = carrito.map((x) => ({
         producto_id: x.producto_id,
@@ -109,9 +117,8 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
 
       const validacion = await validarStockDisponible(lineas, permitirSinStock);
       if (!validacion.ok) {
-        Alert.alert(
-          'Stock insuficiente',
-          `Producto ${validacion.producto_id}: disponible ${validacion.disponible}`
+        setError(
+          `Stock insuficiente: ${validacion.producto_id} (disponible ${validacion.disponible})`
         );
         setGuardando(false);
         return;
@@ -127,98 +134,173 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
         usuario,
         device_id,
         lineas,
-        forzada: false, // si llegamos aquí, la validación pasó
+        forzada: false,
       });
 
-      Alert.alert(
-        'Venta registrada',
-        `ID: ${id_venta}\nTotal: ${total.toFixed(2)} CUP`
-      );
       setCarrito([]);
-      onCerrar(true); // ← indica que hubo venta
+      onCerrar(true);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      setError(e.message ?? 'Error al registrar la venta');
     } finally {
       setGuardando(false);
     }
   }
 
-  function cancelar() {
-    onCerrar(false); // ← indica que no hubo venta
-  }
-
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <Text style={styles.titulo}>Nueva venta</Text>
-      <Text>Usuario: {usuario}</Text>
+    <SafeAreaView style={[commonStyles.container, styles.fondo]} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <Text variant="titleLarge">Nueva venta</Text>
+        <Text variant="bodyMedium" style={styles.usuario}>
+          Usuario: {usuario}
+        </Text>
+      </View>
 
       <FlatList
         style={{ flex: 1 }}
         data={productos}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.filaProducto}
-            onPress={() => agregar(item)}
-          >
-            <Text>{item.nombre}</Text>
-            <Text>
-              {item.stock_mostrado} disp. | {item.precio} CUP
-            </Text>
-          </TouchableOpacity>
-        )}
+        contentContainerStyle={styles.listaProductos}
+        renderItem={({ item }) => {
+          const stockBajo = item.stock_mostrado <= 0;
+          return (
+            <Card
+              style={styles.cardProducto}
+              onPress={() => agregar(item)}
+              mode="elevated"
+            >
+              <Card.Content>
+                <View style={styles.filaProducto}>
+                  <Text variant="titleMedium" style={styles.nombreProducto}>
+                    {item.nombre}
+                  </Text>
+                  <Text
+                    variant="labelLarge"
+                    style={{ color: stockBajo ? colores.stockBajo : colores.stockOk }}
+                  >
+                    {item.stock_mostrado} disp.
+                  </Text>
+                </View>
+                <Text variant="bodyMedium" style={styles.precioProducto}>
+                  {item.precio.toFixed(2)} CUP
+                </Text>
+              </Card.Content>
+            </Card>
+          );
+        }}
+        ListEmptyComponent={
+          <Text variant="bodyMedium" style={commonStyles.vacio}>
+            No hay productos activos.
+          </Text>
+        }
       />
 
       <View style={styles.carrito}>
-        <Text style={styles.subtitulo}>Carrito</Text>
-        {carrito.length === 0 && <Text>(vacío)</Text>}
+        <Text variant="titleMedium" style={styles.subtitulo}>
+          Carrito
+        </Text>
+        {carrito.length === 0 && (
+          <Text variant="bodyMedium" style={commonStyles.vacio}>
+            (vacío)
+          </Text>
+        )}
         {carrito.map((item) => (
           <View key={item.producto_id} style={styles.filaCarrito}>
-            <Text style={{ flex: 1 }}>{item.nombre}</Text>
-            <Button
-              title="−"
+            <Text variant="bodyLarge" style={styles.nombreCarrito} numberOfLines={1}>
+              {item.nombre}
+            </Text>
+            <IconButton
+              icon="minus"
+              size={20}
               onPress={() => cambiarCantidad(item.producto_id, -1)}
             />
-            <Text style={{ marginHorizontal: 8 }}>{item.cantidad}</Text>
-            <Button
-              title="+"
+            <Text variant="bodyLarge" style={styles.cantidad}>
+              {item.cantidad}
+            </Text>
+            <IconButton
+              icon="plus"
+              size={20}
               onPress={() => cambiarCantidad(item.producto_id, +1)}
             />
+            <Text variant="bodyMedium" style={styles.subtotal}>
+              {(item.cantidad * item.precio_unitario).toFixed(2)}
+            </Text>
           </View>
         ))}
-        <Text style={styles.total}>
-          Total: {total.toFixed(2)} CUP
-        </Text>
+
+        <Divider style={{ marginVertical: 8 }} />
+
+        <View style={styles.filaTotal}>
+          <Text variant="titleMedium">Total</Text>
+          <Text variant="titleLarge" style={styles.total}>
+            {total.toFixed(2)} CUP
+          </Text>
+        </View>
+
         <Button
-          title={guardando ? 'Guardando...' : 'Confirmar venta'}
+          mode="contained"
+          icon="check"
           onPress={confirmar}
+          loading={guardando}
           disabled={guardando || carrito.length === 0}
-        />
-        <Button title="Cancelar" onPress={cancelar} />
+          style={styles.botonConfirmar}
+        >
+          {guardando ? 'Guardando...' : 'Confirmar venta'}
+        </Button>
+        <Button mode="text" onPress={() => onCerrar(false)}>
+          Cancelar
+        </Button>
       </View>
+
+      <Snackbar
+        visible={!!error}
+        onDismiss={() => setError(null)}
+        duration={4000}
+        action={{ label: 'Cerrar', onPress: () => setError(null) }}
+      >
+        {error}
+      </Snackbar>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  titulo: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  subtitulo: { fontSize: 16, fontWeight: 'bold', marginVertical: 8 },
-  filaProducto: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  fondo: { backgroundColor: '#F8FAFC' },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
-  carrito: { paddingTop: 12, borderTopWidth: 1, borderTopColor: '#ccc' },
+  usuario: { color: colores.textoSuave, marginTop: 2 },
+  listaProductos: { paddingHorizontal: 16, paddingBottom: 8 },
+  cardProducto: { marginBottom: 8 },
+  filaProducto: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  nombreProducto: { flex: 1, marginRight: 8 },
+  precioProducto: { color: colores.textoSuave, marginTop: 2 },
+  carrito: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: colores.bordeSuave,
+  },
+  subtitulo: { marginBottom: 4 },
   filaCarrito: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginVertical: 2,
+  },
+  nombreCarrito: { flex: 1, marginRight: 4 },
+  cantidad: { minWidth: 24, textAlign: 'center' },
+  subtotal: { minWidth: 60, textAlign: 'right', color: colores.textoSuave },
+  filaTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginVertical: 4,
   },
-  total: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginVertical: 8,
-    textAlign: 'right',
-  },
+  total: { fontWeight: 'bold' },
+  botonConfirmar: { marginTop: 8, marginBottom: 4 },
 });

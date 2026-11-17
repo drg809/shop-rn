@@ -1,92 +1,142 @@
 import React, { useEffect, useState } from 'react';
+import { View, FlatList, StyleSheet } from 'react-native';
 import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
-    ActivityIndicator,
-    Button,
-    Alert,
-    TouchableOpacity,
-} from 'react-native';
+  Card,
+  Text,
+  Button,
+  ActivityIndicator,
+  Snackbar,
+} from 'react-native-paper';
 import { sincronizarBajada } from '../services/syncService';
-import { listarProductosConStockMostrado, ProductoConStockMostrado } from '../repositories/productosRepo';
+import {
+  listarProductosConStockMostrado,
+  ProductoConStockMostrado,
+} from '../repositories/productosRepo';
+import { commonStyles } from '../styles/commonStyles';
 
 type Props = {
-    refreshKey?: number;
-    onNuevoProducto: () => void;
-    onEditarProducto: (id: string) => void;
+  refreshKey?: number;
+  onNuevoProducto: () => void;
+  onEditarProducto: (id: string) => void;
 };
 
-export default function ProductosScreen({ refreshKey = 0, onNuevoProducto, onEditarProducto }: Props) {
-    const [productos, setProductos] = useState<ProductoConStockMostrado[]>([]);
-    const [cargando, setCargando] = useState(true);
+export default function ProductosScreen({
+  refreshKey = 0,
+  onNuevoProducto,
+  onEditarProducto,
+}: Props) {
+  const [productos, setProductos] = useState<ProductoConStockMostrado[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    async function recargarLista() {
-        const lista = await listarProductosConStockMostrado();
-        setProductos(lista);
+  async function recargarLista() {
+    const lista = await listarProductosConStockMostrado();
+    setProductos(lista);
+  }
+
+  async function sincronizarYRefrescar() {
+    setCargando(true);
+    setError(null);
+    try {
+      await sincronizarBajada();
+      await recargarLista();
+    } catch (e: any) {
+      setError(e.message ?? 'Error de sincronización');
+    } finally {
+      setCargando(false);
     }
+  }
 
-    async function sincronizarYRefrescar() {
-        setCargando(true);
-        try {
-            await sincronizarBajada();
-            await recargarLista()
-        } catch (e: any) {
-            Alert.alert('Error de sincronización', e.message);
-        } finally {
-            setCargando(false);
-        }
+  useEffect(() => {
+    sincronizarYRefrescar();
+  }, []);
+
+  useEffect(() => {
+    if (refreshKey > 0) {
+      recargarLista();
     }
+  }, [refreshKey]);
 
-    useEffect(() => {
-        sincronizarYRefrescar();
-    }, []);
-
-    useEffect(() => {
-        if (refreshKey > 0) {
-            recargarLista();
-        }
-    }, [refreshKey]);
-
-    if (cargando) {
-        return <ActivityIndicator style={styles.centrado} size="large" />;
-    }
-
+  if (cargando && productos.length === 0) {
     return (
-        <View style={styles.container}>
-            <Button title="Sincronizar" onPress={sincronizarYRefrescar} />
-            <Button title="Nuevo producto" onPress={onNuevoProducto} />
-            <FlatList
-                data={productos}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={styles.item}
-                        onPress={() => onEditarProducto(item.id)}
-                    >
-                        <Text style={styles.nombre}>{item.nombre}</Text>
-                        <Text>
-                            Stock: {item.stock_mostrado} | Mín: {item.stock_minimo} | {item.precio} CUP
-                        </Text>
-                    </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                    <Text style={styles.vacio}>No hay productos. Añade alguno en la hoja.</Text>
-                }
-            />
-        </View>
+      <View style={commonStyles.centrado}>
+        <ActivityIndicator size="large" />
+      </View>
     );
-}
+  }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, padding: 16 },
-    centrado: { flex: 1 },
-    item: {
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    nombre: { fontWeight: 'bold', fontSize: 16 },
-    vacio: { padding: 16 },
-});
+  return (
+    <View style={commonStyles.container}>
+      <View style={commonStyles.acciones}>
+        <Button
+          mode="contained"
+          icon="sync"
+          onPress={sincronizarYRefrescar}
+          loading={cargando}
+          disabled={cargando}
+          style={commonStyles.botonAccion}
+        >
+          Sincronizar
+        </Button>
+        <Button
+          mode="outlined"
+          icon="plus"
+          onPress={onNuevoProducto}
+          style={commonStyles.botonAccion}
+        >
+          Nuevo producto
+        </Button>
+      </View>
+
+      <FlatList
+        data={productos}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={commonStyles.lista}
+        renderItem={({ item }) => {
+          const stockBajo = item.stock_mostrado <= item.stock_minimo;
+          return (
+            <Card
+              style={commonStyles.card}
+              onPress={() => onEditarProducto(item.id)}
+              mode="elevated"
+            >
+              <Card.Content>
+                <View style={commonStyles.cardHeader}>
+                  <Text variant="titleMedium" style={commonStyles.nombre}>
+                    {item.nombre}
+                  </Text>
+                  <Text
+                    variant="labelLarge"
+                    style={[
+                      commonStyles.stock,
+                      stockBajo ? commonStyles.stockBajo : commonStyles.stockOk,
+                    ]}
+                  >
+                    {item.stock_mostrado} disp.
+                  </Text>
+                </View>
+                <Text variant="bodyMedium" style={commonStyles.detalle}>
+                  Mín: {item.stock_minimo} · {item.precio.toFixed(2)} CUP
+                </Text>
+              </Card.Content>
+            </Card>
+          );
+        }}
+        ListEmptyComponent={
+          <Text variant="bodyMedium" style={commonStyles.vacio}>
+            No hay productos. Añade alguno en la hoja.
+          </Text>
+        }
+      />
+
+      <Snackbar
+        visible={!!error}
+        onDismiss={() => setError(null)}
+        duration={4000}
+        action={{ label: 'Cerrar', onPress: () => setError(null) }}
+      >
+        {error}
+      </Snackbar>
+    </View>
+  );
+}
