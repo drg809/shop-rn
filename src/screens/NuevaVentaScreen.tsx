@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Snackbar,
   Divider,
+  Dialog,
+  Portal
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -44,6 +46,8 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   const [usuario, setUsuario] = useState<string>('admin');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialogoVaciar, setDialogoVaciar] = useState(false);
+
 
   async function cargar() {
     const lista = await listarProductosConStockMostrado();
@@ -57,9 +61,18 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   }, []);
 
   function agregar(p: ProductoConStockMostrado) {
+    if (p.stock_mostrado <= 0) {
+      setError(`"${p.nombre}" está agotado`);
+      return;
+    }
+    const existente = carrito.find((x) => x.producto_id === p.id);
+    if (existente && existente.cantidad + 1 > p.stock_mostrado) {
+      setError(`No hay más stock de "${p.nombre}"`);
+      return;
+    }
     setCarrito((prev) => {
-      const existente = prev.find((x) => x.producto_id === p.id);
-      if (existente) {
+      const ex = prev.find((x) => x.producto_id === p.id);
+      if (ex) {
         return prev.map((x) =>
           x.producto_id === p.id ? { ...x, cantidad: x.cantidad + 1 } : x
         );
@@ -78,6 +91,13 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   }
 
   function cambiarCantidad(producto_id: string, delta: number) {
+    if (delta > 0) {
+      const item = carrito.find((x) => x.producto_id === producto_id);
+      if (item && item.cantidad + delta > item.stock_mostrado) {
+        setError(`No hay más stock de "${item.nombre}"`);
+        return;
+      }
+    }
     setCarrito((prev) =>
       prev
         .map((x) =>
@@ -146,6 +166,15 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
     }
   }
 
+  function confirmarVaciar() {
+    setDialogoVaciar(true);
+  }
+
+  function vaciarCarrito() {
+    setCarrito([]);
+    setDialogoVaciar(false);
+  }
+
   return (
     <SafeAreaView style={[commonStyles.container, styles.fondo]} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -164,9 +193,10 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
           const stockBajo = item.stock_mostrado <= 0;
           return (
             <Card
-              style={styles.cardProducto}
+              style={[styles.cardProducto, stockBajo && styles.cardAgotado]}
               onPress={() => agregar(item)}
               mode="elevated"
+              disabled={stockBajo}
             >
               <Card.Content>
                 <View style={styles.filaProducto}>
@@ -177,7 +207,7 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
                     variant="labelLarge"
                     style={{ color: stockBajo ? colores.stockBajo : colores.stockOk }}
                   >
-                    {item.stock_mostrado} disp.
+                    {stockBajo ? 'Agotado' : `${item.stock_mostrado} disp.`}
                   </Text>
                 </View>
                 <Text variant="bodyMedium" style={styles.precioProducto}>
@@ -195,9 +225,20 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
       />
 
       <View style={styles.carrito}>
-        <Text variant="titleMedium" style={styles.subtitulo}>
-          Carrito
-        </Text>
+        <View style={styles.filaSubtituloCarrito}>
+          <Text variant="titleMedium">Carrito</Text>
+        </View>
+        {carrito.length > 0 && (
+          <Button
+            mode="text"
+            icon="delete-outline"
+            onPress={confirmarVaciar}
+            compact
+            textColor={colores.stockBajo}
+          >
+            Vaciar
+          </Button>
+        )}
         {carrito.length === 0 && (
           <Text variant="bodyMedium" style={commonStyles.vacio}>
             (vacío)
@@ -259,6 +300,22 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
       >
         {error}
       </Snackbar>
+      <Portal>
+        <Dialog visible={dialogoVaciar} onDismiss={() => setDialogoVaciar(false)}>
+          <Dialog.Title>Vaciar carrito</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              ¿Seguro que quieres quitar todos los productos del carrito?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDialogoVaciar(false)}>Cancelar</Button>
+            <Button onPress={vaciarCarrito} textColor={colores.stockBajo}>
+              Vaciar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -292,6 +349,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 2,
   },
+  filaSubtituloCarrito: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   nombreCarrito: { flex: 1, marginRight: 4 },
   cantidad: { minWidth: 24, textAlign: 'center' },
   subtotal: { minWidth: 60, textAlign: 'right', color: colores.textoSuave },
@@ -303,4 +366,5 @@ const styles = StyleSheet.create({
   },
   total: { fontWeight: 'bold' },
   botonConfirmar: { marginTop: 8, marginBottom: 4 },
+  cardAgotado: { opacity: 0.6 }
 });
