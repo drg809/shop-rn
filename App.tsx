@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { PaperProvider, Button } from 'react-native-paper';
 
 import ProductosScreen from './src/screens/ProductosScreen';
 import NuevaVentaScreen from './src/screens/NuevaVentaScreen';
 import PendientesScreen from './src/screens/PendientesScreen';
 import { contarPendientes } from './src/repositories/movimientosPendientesRepo';
 import EditarProductoScreen from './src/screens/EditarProductoScreen';
+import { theme } from './theme';
+import { commonStyles } from './src/styles/commonStyles';
 
 type Pantalla = 'productos' | 'venta' | 'pendientes' | 'editarProducto';
 
@@ -33,68 +36,67 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      {pantalla === 'venta' ? (
-        <NuevaVentaScreen onCerrar={cerrarVenta} />
-      ) : pantalla === 'pendientes' ? (
-        <PendientesScreen
-          onVolver={() => {
-            setPantalla('productos');
-            setRefreshKey(k => k + 1);
-          }}
-          onSyncTerminada={() => {
-            refrescarContador();
-            setRefreshKey(k => k + 1);
-          }}
-        />
-      ) : pantalla === 'editarProducto' ? (
-        <EditarProductoScreen
-          productoId={productoEditando}
-          onCerrar={(huboCambios) => {
-            setProductoEditando(undefined);
-            setPantalla('productos');
-            if (huboCambios) setRefreshKey(k => k + 1);
-          }}
-        />
-      ) : pantalla === 'productos' ? (
-        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-          <View style={styles.container}>
-            <View style={styles.contenido}>
-              <ProductosScreen
-                refreshKey={refreshKey}
-                onNuevoProducto={() => {
-                  setProductoEditando(undefined);
-                  setPantalla('editarProducto');
-                }}
-                onEditarProducto={(id) => {
-                  setProductoEditando(id);
-                  setPantalla('editarProducto');
-                }}
-              />
+    <PaperProvider theme={theme}>
+      <SafeAreaProvider>
+        {pantalla === 'venta' ? (
+          <NuevaVentaScreen onCerrar={cerrarVenta} />
+        ) : pantalla === 'pendientes' ? (
+          <PendientesScreen
+            onVolver={() => {
+              setPantalla('productos');
+              setRefreshKey(k => k + 1);
+            }}
+            onSyncTerminada={() => {
+              refrescarContador();
+              setRefreshKey(k => k + 1);
+            }}
+          />
+        ) : pantalla === 'editarProducto' ? (
+          <EditarProductoScreen
+            productoId={productoEditando}
+            onCerrar={(huboCambios) => {
+              setProductoEditando(undefined);
+              setPantalla('productos');
+              if (huboCambios) setRefreshKey(k => k + 1);
+            }}
+          />
+        ) : pantalla === 'productos' ? (
+          <SafeAreaView style={[commonStyles.container, commonStyles.bkgApp]} edges={['top', 'bottom']}>
+            <View style={commonStyles.container}>
+              <View style={commonStyles.container}>
+                <ProductosScreen
+                  refreshKey={refreshKey}
+                  onNuevoProducto={() => {
+                    setProductoEditando(undefined);
+                    setPantalla('editarProducto');
+                  }}
+                  onEditarProducto={(id) => {
+                    setProductoEditando(id);
+                    setPantalla('editarProducto');
+                  }}
+                />
+              </View>
+              <View style={commonStyles.barraInferior}>
+                <Button
+                  mode="contained"
+                  icon="cart"
+                  onPress={() => setPantalla('venta')}
+                  style={{ marginBottom: 8 }}
+                >
+                  Nueva venta
+                </Button>
+                <Button
+                  mode="outlined"
+                  icon="tray-full"
+                  onPress={() => setPantalla('pendientes')}
+                >
+                  Pendientes ({pendientesCount})
+                </Button>
+              </View>
             </View>
-            <View style={styles.barraInferior}>
-              <Button title="Nueva venta" onPress={() => setPantalla('venta')} />
-              <View style={{ height: 8 }} />
-              <Button
-                title={`Pendientes (${pendientesCount})`}
-                onPress={() => setPantalla('pendientes')}
-              />
-            </View>
-          </View>
-        </SafeAreaView>
-      ) : null}
-    </SafeAreaProvider>
+          </SafeAreaView>
+        ) : null}
+      </SafeAreaProvider>
+    </PaperProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { flex: 1 },
-  contenido: { flex: 1 },
-  barraInferior: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
-  },
-});
