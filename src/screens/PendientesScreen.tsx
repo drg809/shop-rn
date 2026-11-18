@@ -9,6 +9,7 @@ import {
   List
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import {
   listarPendientes,
 } from '../repositories/movimientosPendientesRepo';

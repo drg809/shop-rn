@@ -37,6 +37,7 @@ export default function ProductosScreen({
     const [busqueda, setBusqueda] = useState('');
     const { enCurso: cargando, ejecutar: ejecutarSincronizar } = useAccionUnica();
     const { isOnline } = useNetworkStatus();
+    const [rol, setRol] = useState('vendedor');
 
     const productosFiltrados = useMemo(() => {
         if (!busqueda.trim()) return productos;
@@ -95,6 +96,10 @@ export default function ProductosScreen({
         }
     }, [refreshKey]);
 
+    useEffect(() => {
+        (async () => setRol((await getMeta('usuario_rol')) ?? 'vendedor'))();
+    }, []);
+
     if (cargando && productos.length === 0) {
         return (
             <View style={commonStyles.centrado}>
@@ -116,14 +121,16 @@ export default function ProductosScreen({
                 >
                     Sincronizar
                 </Button>
-                <Button
-                    mode="outlined"
-                    icon="plus"
-                    onPress={onNuevoProducto}
-                    style={commonStyles.botonAccion}
-                >
-                    Nuevo producto
-                </Button>
+                {rol === 'admin' && (
+                    <Button
+                        mode="outlined"
+                        icon="plus"
+                        onPress={onNuevoProducto}
+                        style={commonStyles.botonAccion}
+                    >
+                        Nuevo producto
+                    </Button>
+                )}
             </View>
 
             <Searchbar
