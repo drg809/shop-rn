@@ -10,6 +10,7 @@ export type Producto = {
 export type Usuario = {
   usuario: string;
   activo: boolean;
+  rol: 'admin' | 'vendedor';
 };
 
 export type Movimiento = {

@@ -10,7 +10,8 @@ export const CREATE_TABLES_SQL = `
 
   CREATE TABLE IF NOT EXISTS usuarios (
     usuario TEXT PRIMARY KEY,
-    activo INTEGER NOT NULL DEFAULT 1
+    activo INTEGER NOT NULL DEFAULT 1,
+    rol TEXT NOT NULL DEFAULT 'vendedor'
   );
 
   CREATE TABLE IF NOT EXISTS movimientos_pendientes (

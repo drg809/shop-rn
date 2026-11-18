@@ -7,6 +7,19 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
   db = await SQLite.openDatabaseAsync('tienda.db');
   await db.execAsync(CREATE_TABLES_SQL);
+
+  const metaDefaults: Record<string, string> = {
+    usuario_actual: 'admin',
+    usuario_rol: 'admin',
+    permitir_venta_sin_stock: 'false',
+  };
+  for (const [clave, valor] of Object.entries(metaDefaults)) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO meta (clave, valor) VALUES (?, ?)',
+      [clave, valor]
+    );
+  }
+
   return db;
 }
 
