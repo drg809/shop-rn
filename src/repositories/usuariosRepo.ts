@@ -17,5 +17,5 @@ export async function reemplazarUsuarios(usuarios: Usuario[]): Promise<void> {
 export async function listarUsuarios(): Promise<Usuario[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<any>('SELECT * FROM usuarios');
-  return rows.map(r => ({ usuario: r.usuario, activo: r.activo === 1 }));
+  return rows.map(r => ({ usuario: r.usuario, activo: r.activo === 1, rol: r.rol }));
 }
