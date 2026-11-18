@@ -1,32 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { PaperProvider, Button, Text } from 'react-native-paper';
-import { useNetworkStatus } from './src/hooks/useNetworkStatus';
+import { PaperProvider, Button, Menu, IconButton } from 'react-native-paper';
 
 import ProductosScreen from './src/screens/ProductosScreen';
 import NuevaVentaScreen from './src/screens/NuevaVentaScreen';
 import PendientesScreen from './src/screens/PendientesScreen';
-import { contarGruposPendientes } from './src/repositories/movimientosPendientesRepo';
 import EditarProductoScreen from './src/screens/EditarProductoScreen';
-import { theme } from './theme';
-import { commonStyles, colores } from './src/styles/commonStyles';
+import AjustesScreen from './src/screens/AjustesScreen';
+import { contarGruposPendientes } from './src/repositories/movimientosPendientesRepo';
+import { getMeta } from './src/db/database';
+import { theme } from './src/theme';
+import { commonStyles } from './src/styles/commonStyles';
 
-type Pantalla = 'productos' | 'venta' | 'pendientes' | 'editarProducto';
+type Pantalla = 'productos' | 'venta' | 'pendientes' | 'editarProducto' | 'ajustes';
 
 export default function App() {
   const [pantalla, setPantalla] = useState<Pantalla>('productos');
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendientesCount, setPendientesCount] = useState(0);
   const [productoEditando, setProductoEditando] = useState<string | undefined>(undefined);
-  const { isOnline } = useNetworkStatus();
+  const [rol, setRol] = useState<string>('vendedor');
+  const [menuVisible, setMenuVisible] = useState(false);
 
   async function refrescarContador() {
     setPendientesCount(await contarGruposPendientes());
   }
 
+  async function refrescarRol() {
+    setRol((await getMeta('usuario_rol')) ?? 'vendedor');
+    console.log(rol);
+    console.log(await getMeta('usuario_rol'));
+  }
+
   useEffect(() => {
     refrescarContador();
+  }, [pantalla]);
+
+  useEffect(() => {
+    refrescarRol();
   }, [pantalla]);
 
   function cerrarVenta(huboVenta?: boolean) {
@@ -34,15 +46,20 @@ export default function App() {
     if (huboVenta) {
       setRefreshKey(k => k + 1);
       refrescarContador();
-    };
+    }
   }
+
+  // Guard: si el rol no es admin y la pantalla es protegida, redirigir a productos
+  const esAdmin = rol === 'admin';
+  const pantallaProtegida = pantalla === 'editarProducto' || pantalla === 'ajustes';
+  const pantallaEfectiva: Pantalla = pantallaProtegida && !esAdmin ? 'productos' : pantalla;
 
   return (
     <PaperProvider theme={theme}>
       <SafeAreaProvider>
-        {pantalla === 'venta' ? (
+        {pantallaEfectiva === 'venta' ? (
           <NuevaVentaScreen onCerrar={cerrarVenta} />
-        ) : pantalla === 'pendientes' ? (
+        ) : pantallaEfectiva === 'pendientes' ? (
           <PendientesScreen
             onVolver={() => {
               setPantalla('productos');
@@ -53,7 +70,7 @@ export default function App() {
               setRefreshKey(k => k + 1);
             }}
           />
-        ) : pantalla === 'editarProducto' ? (
+        ) : pantallaEfectiva === 'editarProducto' && esAdmin ? (
           <EditarProductoScreen
             productoId={productoEditando}
             onCerrar={(huboCambios) => {
@@ -62,44 +79,70 @@ export default function App() {
               if (huboCambios) setRefreshKey(k => k + 1);
             }}
           />
-        ) : pantalla === 'productos' ? (
-          <SafeAreaView style={[commonStyles.container, commonStyles.bkgApp]} edges={['top', 'bottom']}>
+        ) : pantallaEfectiva === 'ajustes' && esAdmin ? (
+          <AjustesScreen onVolver={() => setPantalla('productos')} />
+        ) : pantallaEfectiva === 'productos' ? (
+          <SafeAreaView
+            style={[commonStyles.container, commonStyles.bkgApp]}
+            edges={['top', 'bottom']}
+          >
             <View style={commonStyles.container}>
               <View style={commonStyles.container}>
                 <ProductosScreen
                   refreshKey={refreshKey}
                   onNuevoProducto={() => {
+                    if (!esAdmin) return;
                     setProductoEditando(undefined);
                     setPantalla('editarProducto');
                   }}
                   onEditarProducto={(id) => {
+                    if (!esAdmin) return;
                     setProductoEditando(id);
                     setPantalla('editarProducto');
                   }}
                 />
               </View>
-              <View style={commonStyles.indicadorRed}>
-                <View style={[commonStyles.punto, { backgroundColor: isOnline ? colores.stockOk : colores.stockBajo }]} />
-                <Text variant="labelSmall" style={{ color: colores.textoSuave }}>
-                  {isOnline ? 'En línea' : 'Sin conexión'}
-                </Text>
-              </View>
               <View style={commonStyles.barraInferior}>
-                <Button
-                  mode="contained"
-                  icon="cart"
-                  onPress={() => setPantalla('venta')}
-                  style={{ marginBottom: 8 }}
-                >
-                  Nueva venta
-                </Button>
-                <Button
-                  mode="outlined"
-                  icon="tray-full"
-                  onPress={() => setPantalla('pendientes')}
-                >
-                  Pendientes ({pendientesCount})
-                </Button>
+                <View style={styles.filaBotones}>
+                  <Button
+                    mode="contained"
+                    icon="cart"
+                    onPress={() => setPantalla('venta')}
+                    style={styles.botonPrincipal}
+                  >
+                    Nueva venta
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    icon="tray-full"
+                    onPress={() => setPantalla('pendientes')}
+                    style={styles.botonPrincipal}
+                  >
+                    Pendientes ({pendientesCount})
+                  </Button>
+                  {esAdmin && (
+                    <Menu
+                      visible={menuVisible}
+                      onDismiss={() => setMenuVisible(false)}
+                      anchor={
+                        <IconButton
+                          icon="dots-vertical"
+                          size={24}
+                          onPress={() => setMenuVisible(true)}
+                        />
+                      }
+                    >
+                      <Menu.Item
+                        onPress={() => {
+                          setMenuVisible(false);
+                          setPantalla('ajustes');
+                        }}
+                        title="Ajustes"
+                        leadingIcon="cog"
+                      />
+                    </Menu>
+                  )}
+                </View>
               </View>
             </View>
           </SafeAreaView>
@@ -108,3 +151,12 @@ export default function App() {
     </PaperProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  filaBotones: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  botonPrincipal: { flex: 1 },
+});
