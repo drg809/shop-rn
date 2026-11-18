@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import {
   Text,
@@ -6,6 +6,7 @@ import {
   Card,
   ActivityIndicator,
   Snackbar,
+  List
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -14,10 +15,19 @@ import {
 import { sincronizarCompleta } from '../services/syncService';
 import { Movimiento } from '../types';
 import { commonStyles, colores } from '../styles/commonStyles';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 type Props = {
   onVolver: () => void;
   onSyncTerminada?: (subidos: number) => void;
+};
+
+type GrupoVenta = {
+  id_venta: string;
+  fecha: string;
+  usuario: string;
+  movimientos: Movimiento[];
+  total: number; // suma de cantidad * precio_unitario (si lo tienes)
 };
 
 export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
@@ -25,6 +35,31 @@ export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
   const [sincronizando, setSincronizando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
+  const { isOnline } = useNetworkStatus();
+
+  const grupos: GrupoVenta[] = useMemo(() => {
+    const mapa = new Map<string, GrupoVenta>();
+
+    for (const m of pendientes) {
+      const key = m.id_venta || m.id_mov;
+      if (!mapa.has(key)) {
+        mapa.set(key, {
+          id_venta: key,
+          fecha: m.fecha,
+          usuario: m.usuario,
+          movimientos: [],
+          total: 0,
+        });
+      }
+      const grupo = mapa.get(key)!;
+      grupo.movimientos.push(m);
+      grupo.total += m.cantidad;
+    }
+
+    return Array.from(mapa.values()).sort(
+      (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+    );
+  }, [pendientes]);
 
   async function cargar() {
     setPendientes(await listarPendientes());
@@ -55,7 +90,9 @@ export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
   return (
     <SafeAreaView style={[commonStyles.container, styles.fondo]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text variant="titleLarge">Pendientes ({pendientes.length})</Text>
+        <Text variant="titleLarge">
+          Pendientes ({grupos.length} {grupos.length === 1 ? 'grupo' : 'grupos'}, {pendientes.length} mov.)
+        </Text>
         <Text variant="bodyMedium" style={styles.subtitulo}>
           Movimientos sin sincronizar con la hoja
         </Text>
@@ -70,33 +107,30 @@ export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
         </View>
       ) : (
         <FlatList
-          data={pendientes}
-          keyExtractor={(p) => p.id_mov}
+          data={grupos}
+          keyExtractor={(g) => g.id_venta}
           contentContainerStyle={styles.lista}
           renderItem={({ item }) => (
-            <Card style={commonStyles.card} mode="elevated">
-              <Card.Content>
-                <View style={styles.filaTipo}>
-                  <Text variant="titleMedium">
-                    {item.tipo.toUpperCase()}
-                  </Text>
-                  <Text variant="labelLarge" style={styles.cantidad}>
-                    {item.cantidad}
-                  </Text>
-                </View>
-                <Text variant="bodyMedium" style={commonStyles.detalle}>
-                  Producto: {item.producto_id}
-                </Text>
-                <Text variant="bodySmall" style={styles.fecha}>
-                  {item.fecha}
-                </Text>
-                {item.id_venta ? (
-                  <Text variant="bodySmall" style={styles.venta}>
-                    Venta: {item.id_venta}
-                  </Text>
-                ) : null}
-              </Card.Content>
-            </Card>
+            <List.Accordion
+              title={item.id_venta.startsWith('V-') ? `Venta ${item.id_venta}` : `Ajuste ${item.id_venta}`}
+              description={`${item.movimientos.length} línea(s) · ${item.total} uds · ${item.fecha.slice(0, 16).replace('T', ' ')}`}
+              left={(props) => (
+                <List.Icon
+                  {...props}
+                  icon={item.id_venta.startsWith('V-') ? 'cart' : 'tune'}
+                />
+              )}
+              style={[commonStyles.card, { backgroundColor: '#FFFFFF', borderRadius: 12 }]}
+            >
+              {item.movimientos.map((m) => (
+                <List.Item
+                  key={m.id_mov}
+                  title={`${m.tipo.toUpperCase()} · ${m.producto_id}`}
+                  description={`Cantidad: ${m.cantidad}`}
+                  left={(props) => <List.Icon {...props} icon="package-variant" />}
+                />
+              ))}
+            </List.Accordion>
           )}
           ListEmptyComponent={
             <Text variant="bodyMedium" style={commonStyles.vacio}>
@@ -105,7 +139,12 @@ export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
           }
         />
       )}
-
+      <View style={commonStyles.indicadorRed}>
+        <View style={[commonStyles.punto, { backgroundColor: isOnline ? colores.stockOk : colores.stockBajo }]} />
+        <Text variant="labelSmall" style={{ color: colores.textoSuave }}>
+          {isOnline ? 'En línea' : 'Sin conexión'}
+        </Text>
+      </View>
       <View style={commonStyles.barraInferior}>
         <Button
           mode="contained"

@@ -2,54 +2,67 @@ import { StyleSheet } from 'react-native';
 
 // Colores de apoyo (los que no están en el tema de Paper)
 export const colores = {
-  stockOk: '#16A34A',
-  stockBajo: '#DC2626',
-  textoSuave: '#64748B',
-  bordeSuave: '#E2E8F0',
+    stockOk: '#16A34A',
+    stockBajo: '#DC2626',
+    textoSuave: '#64748B',
+    bordeSuave: '#E2E8F0',
 };
 
 export const commonStyles = StyleSheet.create({
-  // Layout básico
-  container: { flex: 1 },
-  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    // Layout básico
+    container: { flex: 1 },
+    centrado: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    bkgApp: { backgroundColor: '#F8FAFC' },
+    // Barra de acciones (botones superiores)
+    acciones: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 8,
+    },
+    botonAccion: { flex: 1 },
 
-  // Barra de acciones (botones superiores)
-  acciones: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  botonAccion: { flex: 1 },
+    // Listas y tarjetas
+    lista: { paddingHorizontal: 16, paddingBottom: 16 },
+    card: { marginBottom: 12 },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
 
-  // Listas y tarjetas
-  lista: { paddingHorizontal: 16, paddingBottom: 16 },
-  card: { marginBottom: 12 },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
+    // Textos
+    nombre: { flex: 1, marginRight: 8 },
+    stock: { fontWeight: 'bold' },
+    stockOk: { color: '#16A34A' },
+    stockBajo: { color: '#DC2626' },
+    detalle: { color: colores.textoSuave },
+    vacio: { textAlign: 'center', padding: 24, color: colores.textoSuave },
 
-  // Textos
-  nombre: { flex: 1, marginRight: 8 },
-  stock: { fontWeight: 'bold' },
-  detalle: { color: colores.textoSuave },
-  vacio: { textAlign: 'center', padding: 24, color: colores.textoSuave },
-
-  // Barra inferior (la usas en App.tsx)
-  barraInferior: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colores.bordeSuave,
-    backgroundColor: '#FFFFFF',
-  },
+    barraInferior: {
+        padding: 12,
+        borderTopWidth: 1,
+        borderTopColor: colores.bordeSuave,
+        backgroundColor: '#FFFFFF',
+    },
+    indicadorRed: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingBottom: 8,
+        gap: 6,
+    },
+    punto: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
 });
 
 // Estilos que dependen de un estado (no pueden ir en StyleSheet.create)
 export const stockStyle = (bajo: boolean) => [
-  commonStyles.stock,
-  { color: bajo ? colores.stockBajo : colores.stockOk },
+    commonStyles.stock,
+    { color: bajo ? colores.stockBajo : colores.stockOk },
 ];

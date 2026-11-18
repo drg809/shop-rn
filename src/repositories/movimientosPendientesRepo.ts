@@ -19,6 +19,18 @@ export async function listarPendientes(): Promise<Movimiento[]> {
   }));
 }
 
+export async function contarGruposPendientes(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ total: number }>(`
+    SELECT COUNT(*) as total FROM (
+      SELECT COALESCE(id_venta, id_mov) as grupo
+      FROM movimientos_pendientes
+      GROUP BY grupo
+    )
+  `);
+  return row?.total ?? 0;
+}
+
 export async function contarPendientes(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ n: number }>(
