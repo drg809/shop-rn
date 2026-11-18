@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { PaperProvider, Button } from 'react-native-paper';
+import { PaperProvider, Button, Text } from 'react-native-paper';
+import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 
 import ProductosScreen from './src/screens/ProductosScreen';
 import NuevaVentaScreen from './src/screens/NuevaVentaScreen';
 import PendientesScreen from './src/screens/PendientesScreen';
-import { contarPendientes } from './src/repositories/movimientosPendientesRepo';
+import { contarGruposPendientes } from './src/repositories/movimientosPendientesRepo';
 import EditarProductoScreen from './src/screens/EditarProductoScreen';
 import { theme } from './theme';
-import { commonStyles } from './src/styles/commonStyles';
+import { commonStyles, colores } from './src/styles/commonStyles';
 
 type Pantalla = 'productos' | 'venta' | 'pendientes' | 'editarProducto';
 
@@ -18,9 +19,10 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendientesCount, setPendientesCount] = useState(0);
   const [productoEditando, setProductoEditando] = useState<string | undefined>(undefined);
+  const { isOnline } = useNetworkStatus();
 
   async function refrescarContador() {
-    setPendientesCount(await contarPendientes());
+    setPendientesCount(await contarGruposPendientes());
   }
 
   useEffect(() => {
@@ -75,6 +77,12 @@ export default function App() {
                     setPantalla('editarProducto');
                   }}
                 />
+              </View>
+              <View style={commonStyles.indicadorRed}>
+                <View style={[commonStyles.punto, { backgroundColor: isOnline ? colores.stockOk : colores.stockBajo }]} />
+                <Text variant="labelSmall" style={{ color: colores.textoSuave }}>
+                  {isOnline ? 'En línea' : 'Sin conexión'}
+                </Text>
               </View>
               <View style={commonStyles.barraInferior}>
                 <Button

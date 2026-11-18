@@ -32,6 +32,13 @@ export default function ProductosScreen({
     const [error, setError] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState('');
 
+    const productosFiltrados = useMemo(() => {
+        if (!busqueda.trim()) return productos;
+        const q = busqueda.toLowerCase().trim();
+        return productos.filter(
+            (p) => p.nombre.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
+        );
+    }, [productos, busqueda]);
 
     async function recargarLista() {
         const lista = await listarProductosConStockMostrado();
@@ -68,14 +75,6 @@ export default function ProductosScreen({
             </View>
         );
     }
-
-    const productosFiltrados = useMemo(() => {
-        if (!busqueda.trim()) return productos;
-        const q = busqueda.toLowerCase().trim();
-        return productos.filter(
-            (p) => p.nombre.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
-        );
-    }, [productos, busqueda]);
 
     return (
         <View style={commonStyles.container}>
