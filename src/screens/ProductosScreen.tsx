@@ -14,6 +14,7 @@ import {
     ProductoConStockMostrado,
 } from '../repositories/productosRepo';
 import { commonStyles } from '../styles/commonStyles';
+import { useAccionUnica } from '../hooks/useAccionUnica';
 
 type Props = {
     refreshKey?: number;
@@ -28,9 +29,9 @@ export default function ProductosScreen({
     onEditarProducto,
 }: Props) {
     const [productos, setProductos] = useState<ProductoConStockMostrado[]>([]);
-    const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState('');
+    const { enCurso: cargando, ejecutar: ejecutarSincronizar } = useAccionUnica();
 
     const productosFiltrados = useMemo(() => {
         if (!busqueda.trim()) return productos;
@@ -46,16 +47,15 @@ export default function ProductosScreen({
     }
 
     async function sincronizarYRefrescar() {
-        setCargando(true);
-        setError(null);
-        try {
-            await sincronizarBajada();
-            await recargarLista();
-        } catch (e: any) {
-            setError(e.message ?? 'Error de sincronización');
-        } finally {
-            setCargando(false);
-        }
+        ejecutarSincronizar(async () => {
+            setError(null);
+            try {
+                await sincronizarBajada();
+                await recargarLista();
+            } catch (e: any) {
+                setError(e.message ?? 'Error de sincronización');
+            }
+        });
     }
 
     useEffect(() => {

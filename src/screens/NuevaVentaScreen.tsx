@@ -27,6 +27,7 @@ import {
 } from '../repositories/ventasRepo';
 import { getMeta, getOrCreateDeviceId } from '../db/database';
 import { commonStyles, colores } from '../styles/commonStyles';
+import { useAccionUnica } from '../hooks/useAccionUnica';
 
 type Props = {
   onCerrar: (huboVenta?: boolean) => void;
@@ -44,10 +45,10 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   const [productos, setProductos] = useState<ProductoConStockMostrado[]>([]);
   const [carrito, setCarrito] = useState<CarritoItem[]>([]);
   const [usuario, setUsuario] = useState<string>('admin');
-  const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogoVaciar, setDialogoVaciar] = useState(false);
 
+  const { enCurso: confirmando, ejecutar: ejecutarConfirmar } = useAccionUnica();
 
   async function cargar() {
     const lista = await listarProductosConStockMostrado();
@@ -115,55 +116,53 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
   );
 
   async function confirmar() {
-    if (carrito.length === 0) {
-      setError('Carrito vacío');
-      return;
-    }
-    if (!usuario) {
-      setError('Selecciona un usuario');
-      return;
-    }
-    setGuardando(true);
-    setError(null);
-    try {
-      const lineas: LineaVenta[] = carrito.map((x) => ({
-        producto_id: x.producto_id,
-        cantidad: x.cantidad,
-        precio_unitario: x.precio_unitario,
-      }));
-
-      const permitirSinStock =
-        (await getMeta('permitir_venta_sin_stock')) === 'true';
-
-      const validacion = await validarStockDisponible(lineas, permitirSinStock);
-      if (!validacion.ok) {
-        setError(
-          `Stock insuficiente: ${validacion.producto_id} (disponible ${validacion.disponible})`
-        );
-        setGuardando(false);
+    ejecutarConfirmar(async () => {
+      if (carrito.length === 0) {
+        setError('Carrito vacío');
         return;
       }
+      if (!usuario) {
+        setError('Selecciona un usuario');
+        return;
+      }
+      setError(null);
+      try {
+        const lineas: LineaVenta[] = carrito.map((x) => ({
+          producto_id: x.producto_id,
+          cantidad: x.cantidad,
+          precio_unitario: x.precio_unitario,
+        }));
 
-      const device_id = await getOrCreateDeviceId();
-      const id_venta =
-        'V-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+        const permitirSinStock =
+          (await getMeta('permitir_venta_sin_stock')) === 'true';
 
-      await registrarVenta({
-        id_venta,
-        fecha: new Date().toISOString(),
-        usuario,
-        device_id,
-        lineas,
-        forzada: false,
-      });
+        const validacion = await validarStockDisponible(lineas, permitirSinStock);
+        if (!validacion.ok) {
+          setError(
+            `Stock insuficiente: ${validacion.producto_id} (disponible ${validacion.disponible})`
+          );
+          return;
+        }
 
-      setCarrito([]);
-      onCerrar(true);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al registrar la venta');
-    } finally {
-      setGuardando(false);
-    }
+        const device_id = await getOrCreateDeviceId();
+        const id_venta =
+          'V-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+
+        await registrarVenta({
+          id_venta,
+          fecha: new Date().toISOString(),
+          usuario,
+          device_id,
+          lineas,
+          forzada: false,
+        });
+
+        setCarrito([]);
+        onCerrar(true);
+      } catch (e: any) {
+        setError(e.message ?? 'Error al registrar la venta');
+      }
+    });
   }
 
   function confirmarVaciar() {
@@ -281,11 +280,11 @@ export default function NuevaVentaScreen({ onCerrar }: Props) {
           mode="contained"
           icon="check"
           onPress={confirmar}
-          loading={guardando}
-          disabled={guardando || carrito.length === 0}
+          loading={confirmando}
+          disabled={confirmando || carrito.length === 0}
           style={styles.botonConfirmar}
         >
-          {guardando ? 'Guardando...' : 'Confirmar venta'}
+          {confirmando ? 'Guardando...' : 'Confirmar venta'}
         </Button>
         <Button mode="text" onPress={() => onCerrar(false)}>
           Cancelar

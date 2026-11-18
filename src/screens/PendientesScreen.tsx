@@ -16,6 +16,7 @@ import { sincronizarCompleta } from '../services/syncService';
 import { Movimiento } from '../types';
 import { commonStyles, colores } from '../styles/commonStyles';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useAccionUnica } from '../hooks/useAccionUnica';
 
 type Props = {
   onVolver: () => void;
@@ -32,10 +33,10 @@ type GrupoVenta = {
 
 export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
   const [pendientes, setPendientes] = useState<Movimiento[]>([]);
-  const [sincronizando, setSincronizando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
   const { isOnline } = useNetworkStatus();
+  const { enCurso: sincronizando, ejecutar: ejecutarSincronizar } = useAccionUnica();
 
   const grupos: GrupoVenta[] = useMemo(() => {
     const mapa = new Map<string, GrupoVenta>();
@@ -70,21 +71,20 @@ export default function PendientesScreen({ onVolver, onSyncTerminada }: Props) {
   }, []);
 
   async function sincronizar() {
-    setSincronizando(true);
-    setError(null);
-    setExito(null);
-    try {
-      const resumen = await sincronizarCompleta();
-      setExito(
-        `Sincronización completada: ${resumen.subidos} movimientos, ${resumen.productos} productos, ${resumen.usuarios} usuarios`
-      );
-      await cargar();
-      onSyncTerminada?.(resumen.subidos);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al sincronizar');
-    } finally {
-      setSincronizando(false);
-    }
+    ejecutarSincronizar(async () => {
+      setError(null);
+      setExito(null);
+      try {
+        const resumen = await sincronizarCompleta();
+        setExito(
+          `Sincronización completada: ${resumen.subidos} movimientos, ${resumen.productos} productos, ${resumen.usuarios} usuarios`
+        );
+        await cargar();
+        onSyncTerminada?.(resumen.subidos);
+      } catch (e: any) {
+        setError(e.message ?? 'Error al sincronizar');
+      }
+    });
   }
 
   return (

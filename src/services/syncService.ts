@@ -65,6 +65,8 @@ export async function sincronizarCompleta(): Promise<ResumenSync> {
 
     if (yaSubidos.length > 0) {
       await eliminarPendientes(yaSubidos.map(p => p.id_mov));
+      const idVentasYa = Array.from(new Set(yaSubidos.map(p => p.id_venta).filter(Boolean)));
+      await marcarVentasSincronizadas(idVentasYa);
     }
 
     if (porSubir.length > 0) {

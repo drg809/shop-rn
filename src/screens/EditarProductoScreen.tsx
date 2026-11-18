@@ -8,6 +8,8 @@ import {
     HelperText,
     ActivityIndicator,
     Snackbar,
+    Portal,
+    Dialog,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -20,6 +22,7 @@ import { registrarAjuste } from '../repositories/ventasRepo';
 import { getOrCreateDeviceId, getMeta } from '../db/database';
 import { Producto } from '../types';
 import { commonStyles, colores } from '../styles/commonStyles';
+import { useAccionUnica } from '../hooks/useAccionUnica';
 
 type Props = {
     productoId?: string;
@@ -33,10 +36,31 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
     const [stockMinimo, setStockMinimo] = useState('0');
     const [activo, setActivo] = useState(true);
     const [ajusteStock, setAjusteStock] = useState('');
-    const [guardando, setGuardando] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [exito, setExito] = useState<string | null>(null);
+    const [inicial, setInicial] = useState<{
+        nombre: string;
+        precio: string;
+        stockMinimo: string;
+        activo: boolean;
+        ajusteStock: string;
+    } | null>(null);
+    const [dialogoCancelar, setDialogoCancelar] = useState(false);
+    const { enCurso: guardando, ejecutar: ejecutarGuardar } = useAccionUnica();
+
+
+
     const esEdicion = Boolean(productoId);
+    const precioNum = Number(precio);
+    const precioValido = precio.trim() !== '' && !isNaN(precioNum) && precioNum >= 0;
+    const precioError =
+        precio.trim() === ''
+            ? 'El precio es obligatorio'
+            : isNaN(precioNum)
+                ? 'El precio debe ser un número'
+                : precioNum < 0
+                    ? 'El precio no puede ser negativo'
+                    : '';
 
     useEffect(() => {
         if (productoId) {
@@ -48,81 +72,112 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
                     setPrecio(String(p.precio));
                     setStockMinimo(String(p.stock_minimo));
                     setActivo(p.activo);
+                    setInicial({
+                        nombre: p.nombre,
+                        precio: String(p.precio),
+                        stockMinimo: String(p.stock_minimo),
+                        activo: p.activo,
+                        ajusteStock: '',
+                    });
                 }
             })();
         } else {
-            setId('P-' + Math.random().toString(36).slice(2, 8).toUpperCase());
+            const nuevoId = 'P-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+            setId(nuevoId);
+            setInicial({
+                nombre: '',
+                precio: '',
+                stockMinimo: '0',
+                activo: true,
+                ajusteStock: '',
+            });
         }
     }, [productoId]);
 
     async function guardar() {
-        setError(null);
-        setExito(null);
-        if (!nombre.trim()) {
-            setError('El nombre es obligatorio');
-            return;
-        }
-        const precioNum = Number(precio);
-        if (isNaN(precioNum) || precioNum < 0) {
-            setError('Precio inválido');
-            return;
-        }
-        const stockMinNum = Number(stockMinimo) || 0;
-
-        setGuardando(true);
-        try {
-            if (!esEdicion) {
-                const prod: Producto = {
-                    id,
-                    nombre: nombre.trim(),
-                    precio: precioNum,
-                    stock_actual: 0,
-                    stock_minimo: stockMinNum,
-                    activo,
-                };
-                await crearProducto(prod);
-                await insertarProductoLocal({
-                    id,
-                    nombre: nombre.trim(),
-                    precio: precioNum,
-                    stock_actual: 0,
-                    stock_minimo: stockMinNum,
-                    activo,
-                });
-                setExito(`Producto creado (ID: ${id})`);
-                setTimeout(() => onCerrar(true), 800);
-            } else {
-                if (nombre.trim()) await actualizarProducto(id, 'nombre', nombre.trim());
-                await actualizarProducto(id, 'precio', precioNum);
-                await actualizarProducto(id, 'stock_minimo', stockMinNum);
-                await actualizarProducto(id, 'activo', activo);
-
-                await actualizarProductoLocal(id, {
-                    nombre: nombre.trim(),
-                    precio: precioNum,
-                    stock_minimo: stockMinNum,
-                    activo,
-                });
-
-                const ajusteNum = Number(ajusteStock);
-                if (!isNaN(ajusteNum) && ajusteNum !== 0) {
-                    const usuario = (await getMeta('usuario_actual')) ?? 'admin';
-                    const device_id = await getOrCreateDeviceId();
-                    await registrarAjuste({
-                        producto_id: id,
-                        cantidad: ajusteNum,
-                        usuario,
-                        device_id,
-                    });
-                }
-
-                setExito('Producto actualizado');
-                setTimeout(() => onCerrar(true), 800);
+        ejecutarGuardar(async () => {
+            setError(null);
+            setExito(null);
+            if (!nombre.trim()) {
+                setError('El nombre es obligatorio');
+                return;
             }
-        } catch (e: any) {
-            setError(e.message ?? 'Error al guardar');
-        } finally {
-            setGuardando(false);
+            if (!precioValido) {
+                setError('Precio inválido');
+                return;
+            }
+
+            const precioNum = Number(precio);
+            const stockMinNum = Number(stockMinimo) || 0;
+
+            try {
+                if (!esEdicion) {
+                    const prod: Producto = {
+                        id,
+                        nombre: nombre.trim(),
+                        precio: precioNum,
+                        stock_actual: 0,
+                        stock_minimo: stockMinNum,
+                        activo,
+                    };
+                    await crearProducto(prod);
+                    await insertarProductoLocal({
+                        id,
+                        nombre: nombre.trim(),
+                        precio: precioNum,
+                        stock_actual: 0,
+                        stock_minimo: stockMinNum,
+                        activo,
+                    });
+                    setExito(`Producto creado (ID: ${id})`);
+                    setTimeout(() => onCerrar(true), 800);
+                } else {
+                    if (nombre.trim()) await actualizarProducto(id, 'nombre', nombre.trim());
+                    await actualizarProducto(id, 'precio', precioNum);
+                    await actualizarProducto(id, 'stock_minimo', stockMinNum);
+                    await actualizarProducto(id, 'activo', activo);
+
+                    await actualizarProductoLocal(id, {
+                        nombre: nombre.trim(),
+                        precio: precioNum,
+                        stock_minimo: stockMinNum,
+                        activo,
+                    });
+
+                    const ajusteNum = Number(ajusteStock);
+                    if (!isNaN(ajusteNum) && ajusteNum !== 0) {
+                        const usuario = (await getMeta('usuario_actual')) ?? 'admin';
+                        const device_id = await getOrCreateDeviceId();
+                        await registrarAjuste({
+                            producto_id: id,
+                            cantidad: ajusteNum,
+                            usuario,
+                            device_id,
+                        });
+                    }
+
+                    setExito('Producto actualizado');
+                    setTimeout(() => onCerrar(true), 800);
+                }
+            } catch (e: any) {
+                setError(e.message ?? 'Error al guardar');
+            }
+        });
+    }
+
+    const hayCambios =
+        inicial !== null &&
+        (nombre !== inicial.nombre ||
+            precio !== inicial.precio ||
+            stockMinimo !== inicial.stockMinimo ||
+            activo !== inicial.activo ||
+            ajusteStock !== inicial.ajusteStock);
+
+    function intentarCancelar() {
+        if (hayCambios) {
+            setDialogoCancelar(true);
+        } else {
+            onCerrar(false);
         }
     }
 
@@ -156,7 +211,11 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
                     keyboardType="decimal-pad"
                     mode="outlined"
                     style={styles.input}
+                    error={!!precioError && precio !== ''}
                 />
+                <HelperText type="error" visible={!!precioError && precio !== ''}>
+                    {precioError}
+                </HelperText>
 
                 <TextInput
                     label="Stock mínimo"
@@ -194,14 +253,14 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
                     icon="content-save"
                     onPress={guardar}
                     loading={guardando}
-                    disabled={guardando}
+                    disabled={guardando || !precioValido || !nombre.trim()}
                     style={styles.botonGuardar}
                 >
                     {guardando ? 'Guardando...' : 'Guardar'}
                 </Button>
                 <Button
                     mode="outlined"
-                    onPress={() => onCerrar(false)}
+                    onPress={intentarCancelar}
                     disabled={guardando}
                 >
                     Cancelar
@@ -231,6 +290,29 @@ export default function EditarProductoScreen({ productoId, onCerrar }: Props) {
             >
                 {exito}
             </Snackbar>
+
+            <Portal>
+                <Dialog visible={dialogoCancelar} onDismiss={() => setDialogoCancelar(false)}>
+                    <Dialog.Title>Descartar cambios</Dialog.Title>
+                    <Dialog.Content>
+                        <Text variant="bodyMedium">
+                            Hay cambios sin guardar. ¿Seguro que quieres salir sin guardarlos?
+                        </Text>
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <Button onPress={() => setDialogoCancelar(false)}>Seguir editando</Button>
+                        <Button
+                            onPress={() => {
+                                setDialogoCancelar(false);
+                                onCerrar(false);
+                            }}
+                            textColor={colores.stockBajo}
+                        >
+                            Descartar
+                        </Button>
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
         </SafeAreaView>
     );
 }
