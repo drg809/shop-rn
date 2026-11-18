@@ -22,9 +22,11 @@ function filaAProducto(row: any[]): Producto {
 }
 
 function filaAUsuario(row: any[]): Usuario {
+  const rol = String(row[2] ?? '').toLowerCase();
   return {
     usuario: String(row[0]),
     activo: row[1] === true || row[1] === 'TRUE' || row[1] === 1,
+    rol: rol === 'admin' ? 'admin' : 'vendedor',
   };
 }
 

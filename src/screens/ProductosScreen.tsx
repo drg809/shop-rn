@@ -8,6 +8,7 @@ import {
     Snackbar,
     Searchbar
 } from 'react-native-paper';
+
 import { sincronizarBajada } from '../services/syncService';
 import {
     listarProductosConStockMostrado,
@@ -15,6 +16,8 @@ import {
 } from '../repositories/productosRepo';
 import { commonStyles } from '../styles/commonStyles';
 import { useAccionUnica } from '../hooks/useAccionUnica';
+import { getMeta } from '../db/database';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 type Props = {
     refreshKey?: number;
@@ -22,6 +25,7 @@ type Props = {
     onEditarProducto: (id: string) => void;
 };
 
+const MINUTOS_ENTRE_SYNC = 5;
 
 export default function ProductosScreen({
     refreshKey = 0,
@@ -32,6 +36,7 @@ export default function ProductosScreen({
     const [error, setError] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState('');
     const { enCurso: cargando, ejecutar: ejecutarSincronizar } = useAccionUnica();
+    const { isOnline } = useNetworkStatus();
 
     const productosFiltrados = useMemo(() => {
         if (!busqueda.trim()) return productos;
@@ -47,6 +52,10 @@ export default function ProductosScreen({
     }
 
     async function sincronizarYRefrescar() {
+        if (!isOnline) {
+            setError('Sin conexión. Conéctate a internet para sincronizar.');
+            return;
+        }
         ejecutarSincronizar(async () => {
             setError(null);
             try {
@@ -58,9 +67,27 @@ export default function ProductosScreen({
         });
     }
 
+    async function checkSync(): Promise<boolean> {
+        const ultima = await getMeta('ultima_sincronizacion');
+        if (!ultima) return true;
+        const diffMs = Date.now() - new Date(ultima).getTime();
+        return diffMs > MINUTOS_ENTRE_SYNC * 60 * 1000;
+    }
+
     useEffect(() => {
-        sincronizarYRefrescar();
-    }, []);
+        if (cargando) return;
+        (async () => {
+            const necesita = await checkSync();
+            if (necesita && isOnline) {
+                await sincronizarYRefrescar();
+            } else {
+                await recargarLista();
+                if (!isOnline) {
+                    setError('Sin conexión. Mostrando datos locales.');
+                }
+            }
+        })();
+    }, [isOnline]);
 
     useEffect(() => {
         if (refreshKey > 0) {
