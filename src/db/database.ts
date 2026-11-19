@@ -10,7 +10,6 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 
   const metaDefaults: Record<string, string> = {
     usuario_actual: 'admin',
-    usuario_rol: 'admin',
     permitir_venta_sin_stock: 'false',
   };
   for (const [clave, valor] of Object.entries(metaDefaults)) {
