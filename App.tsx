@@ -31,20 +31,13 @@ export default function App() {
   async function refrescarRol() {
     const usuarioActual = (await getMeta('usuario_actual')) ?? 'admin';
     const usuarios = await listarUsuarios();
-    console.log('usuario_actual:', usuarioActual);
-    console.log('usuarios en SQLite:', JSON.stringify(usuarios, null, 2));
     const encontrado = usuarios.find(u => u.usuario === usuarioActual);
-    console.log('encontrado:', encontrado);
     const rolReal = encontrado?.rol ?? 'vendedor';
-    console.log('rolReal:', rolReal);
     setRol(rolReal);
   }
 
   useEffect(() => {
     refrescarContador();
-  }, [pantalla]);
-
-  useEffect(() => {
     refrescarRol();
   }, [pantalla]);
 
@@ -106,6 +99,11 @@ export default function App() {
                     if (!esAdmin) return;
                     setProductoEditando(id);
                     setPantalla('editarProducto');
+                  }}
+                  onSyncTerminada={() => {
+                    refrescarRol();
+                    refrescarContador();
+                    setRefreshKey(k => k + 1);
                   }}
                 />
               </View>

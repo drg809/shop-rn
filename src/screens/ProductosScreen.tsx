@@ -23,6 +23,7 @@ type Props = {
     refreshKey?: number;
     onNuevoProducto: () => void;
     onEditarProducto: (id: string) => void;
+    onSyncTerminada?: () => void;
 };
 
 const MINUTOS_ENTRE_SYNC = 5;
@@ -31,6 +32,7 @@ export default function ProductosScreen({
     refreshKey = 0,
     onNuevoProducto,
     onEditarProducto,
+    onSyncTerminada
 }: Props) {
     const [productos, setProductos] = useState<ProductoConStockMostrado[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export default function ProductosScreen({
             try {
                 await sincronizarBajada();
                 await recargarLista();
+                onSyncTerminada?.();
             } catch (e: any) {
                 setError(e.message ?? 'Error de sincronización');
             }

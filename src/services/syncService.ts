@@ -39,15 +39,10 @@ export async function sincronizarBajada(): Promise<{ productos: number; usuarios
   const productos = rawProductos.slice(1).filter(r => r[0]).map(filaAProducto);
   const usuarios = rawUsuarios.slice(1).filter(r => r[0]).map(filaAUsuario);
 
-  console.log('rawUsuarios de la hoja:', JSON.stringify(rawUsuarios, null, 2));
-  console.log('usuarios mapeados:', JSON.stringify(usuarios, null, 2));
-
   await reemplazarProductos(productos);
   try {
     await reemplazarUsuarios(usuarios);
-    console.log('Usuarios tras reemplazar:', JSON.stringify(await listarUsuarios(), null, 2));
   } catch (e: any) {
-    console.error('ERROR en reemplazarUsuarios:', e);
     throw e;
   }
   await setMeta('ultima_sincronizacion', new Date().toISOString());
