@@ -58,11 +58,6 @@ export default function AjustesScreen({ onVolver }: Props) {
 
             const lista = await listarUsuarios();
             setUsuarios(lista.filter((x) => x.activo));
-
-            // Actualizar siempre el rol del usuario actual con el de la hoja
-            const encontrado = lista.find((x) => x.usuario === u);
-            const rolReal = encontrado?.rol ?? 'vendedor';
-            await setMeta('usuario_rol', rolReal);
         } catch (e: any) {
             setError(e.message ?? 'Error al cargar ajustes');
         } finally {
@@ -75,12 +70,15 @@ export default function AjustesScreen({ onVolver }: Props) {
     }, []);
 
     async function cambiarUsuario(nuevo: string) {
-        setUsuario(nuevo);
-        await setMeta('usuario_actual', nuevo);
         const u = usuarios.find(x => x.usuario === nuevo);
-        await setMeta('usuario_rol', u?.rol ?? 'vendedor');
-        setDialogoUsuario(false);
-        setExito(`Usuario cambiado a "${nuevo}"`);
+        if (u) {
+            setUsuario(nuevo);
+            await setMeta('usuario_actual', nuevo);
+            setDialogoUsuario(false);
+            setExito(`Usuario cambiado a "${nuevo}"`);
+        } else {
+            setError('No se encontró el usuario seleccionado.');
+        }
     }
 
     async function cambiarPermitirSinStock(valor: boolean) {

@@ -9,9 +9,10 @@ import PendientesScreen from './src/screens/PendientesScreen';
 import EditarProductoScreen from './src/screens/EditarProductoScreen';
 import AjustesScreen from './src/screens/AjustesScreen';
 import { contarGruposPendientes } from './src/repositories/movimientosPendientesRepo';
-import { getMeta } from './src/db/database';
+import { getMeta, setMeta } from './src/db/database';
 import { theme } from './src/theme';
 import { commonStyles } from './src/styles/commonStyles';
+import { listarUsuarios } from './src/repositories/usuariosRepo';
 
 type Pantalla = 'productos' | 'venta' | 'pendientes' | 'editarProducto' | 'ajustes';
 
@@ -28,9 +29,15 @@ export default function App() {
   }
 
   async function refrescarRol() {
-    setRol((await getMeta('usuario_rol')) ?? 'vendedor');
-    console.log(rol);
-    console.log(await getMeta('usuario_rol'));
+    const usuarioActual = (await getMeta('usuario_actual')) ?? 'admin';
+    const usuarios = await listarUsuarios();
+    console.log('usuario_actual:', usuarioActual);
+    console.log('usuarios en SQLite:', JSON.stringify(usuarios, null, 2));
+    const encontrado = usuarios.find(u => u.usuario === usuarioActual);
+    console.log('encontrado:', encontrado);
+    const rolReal = encontrado?.rol ?? 'vendedor';
+    console.log('rolReal:', rolReal);
+    setRol(rolReal);
   }
 
   useEffect(() => {
